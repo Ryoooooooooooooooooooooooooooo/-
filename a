@@ -1,0 +1,65 @@
+# 発生場所に基づいて緯度と経度のデータを補完するためのサンプル地点の緯度と経度
+location_coordinates = {
+    '北海道厚真町': (42.72141, 141.88059),
+    '千葉県香取市': (35.89716, 140.49972),
+    '新潟県上越市': (37.14828, 138.23642),
+    '島根県大田市': (35.1907, 132.4991),
+    '新潟県胎内市': (37.7659, 138.8476)
+}
+
+# 緯度と経度の欠損値を補完
+data_cleaned.loc[data_cleaned['緯度'].isnull(), '緯度'] = data_cleaned['発生場所'].map(lambda x: location_coordinates[x][0] if x in location_coordinates else None)
+data_cleaned.loc[data_cleaned['経度'].isnull(), '経度'] = data_cleaned['発生場所'].map(lambda x: location_coordinates[x][1] if x in location_coordinates else None)
+
+# 変換後のデータを再確認
+data_cleaned.head()
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+import geopandas as gpd
+
+# データの読み込み
+data = {
+    'country': ['Japan', 'Japan', 'Japan', 'Japan'],
+    'latitude': [35.6895, 35.0, 34.0, 33.0],
+    'longitude': [139.6917, 135.0, 135.0, 130.0],
+    'date': ['2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01'],
+    'flock_size': [1000, 2000, 1500, 1200],
+    'predicted_risk': [0.1, 0.2, 0.15, 0.05]
+}
+
+df = pd.DataFrame(data)
+
+# 特徴量とターゲットの選定
+X = df[['latitude', 'longitude', 'flock_size']]
+y = df['predicted_risk']
+
+# ランダムフォレストモデルの訓練
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X, y)
+
+# 予測の実行
+predicted_risk = model.predict(X)
+
+# GeoDataFrameの作成
+gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.longitude, df.latitude))
+
+# 日本の範囲を設定
+fig, ax = plt.subplots(figsize=(8, 12))
+ax.set_xlim(129, 146)  # 日本のおおよその経度範囲
+ax.set_ylim(30, 46)    # 日本のおおよその緯度範囲
+
+# 予測結果を散布図としてプロット
+scatter = ax.scatter(gdf['longitude'], gdf['latitude'], c=gdf['predicted_risk'], cmap='coolwarm', s=100)
+
+# カラーバーを追加
+cbar = plt.colorbar(scatter, ax=ax)
+cbar.set_label('Predicted Influenza Risk Gradient')
+
+ax.set_title('Predicted Avian Influenza Risk in Japan Over Time')
+ax.set_xlabel('Longitude')
+ax.set_ylabel('Latitude')
+
+plt.show()
